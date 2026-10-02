@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#16181b">
+  <title>切り抜きAR（試作）</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- ① 撮影 -->
+  <section class="screen" id="screen-camera">
+    <div class="stage" id="camera-stage">
+      <video id="video" playsinline muted autoplay></video>
+    </div>
+    <div class="topbar"><span>📷 撮影</span></div>
+    <p class="pill hint">置きたい物をタップ</p>
+    <p class="pill msg" id="camera-msg" hidden></p>
+    <div class="bottombar">
+      <label class="btn ghost">🖼 写真から選ぶ
+        <input type="file" id="file-input" accept="image/*" hidden>
+      </label>
+    </div>
+  </section>
+
+  <!-- ② 切り抜きの確認 -->
+  <section class="screen" id="screen-confirm" hidden>
+    <div class="stage"><canvas id="confirm-canvas"></canvas></div>
+    <div class="topbar">
+      <button class="link" id="btn-confirm-back">← 戻る</button><span>✂️ 切り抜き</span>
+    </div>
+    <p class="pill hint" id="confirm-msg"></p>
+    <div class="bottombar">
+      <button class="btn ghost" id="btn-retry">↺ 撮り直す</button>
+      <button class="btn primary" id="btn-accept" disabled>これにする →</button>
+    </div>
+  </section>
+
+  <!-- ③ 3D で確かめる -->
+  <section class="screen studio" id="screen-preview" hidden>
+    <div class="stage" id="preview-stage"></div>
+    <div class="topbar">
+      <button class="link" id="btn-preview-back">← 戻る</button><span>🧊 3D</span>
+    </div>
+    <div class="panel">
+      <label>厚み <input type="range" id="thickness" min="1" max="10" value="4"></label>
+      <div class="row">ふちの色
+        <span class="swatches">
+          <button class="swatch" data-color="#b9732f" style="background:#b9732f" aria-pressed="true" aria-label="茶色"></button>
+          <button class="swatch" data-color="#ffffff" style="background:#ffffff" aria-pressed="false" aria-label="白"></button>
+          <button class="swatch" data-color="#2b2a27" style="background:#2b2a27" aria-pressed="false" aria-label="黒"></button>
+          <button class="swatch" data-color="#52b788" style="background:#52b788" aria-pressed="false" aria-label="緑"></button>
+        </span>
+      </div>
+      <p class="note" id="ar-msg"></p>
+    </div>
+    <div class="bottombar">
+      <button class="btn primary" id="btn-ar" disabled>📍 AR で置く</button>
+    </div>
+  </section>
+
+  <!-- ④ AR（WebXR の DOM オーバーレイとして表示される） -->
+  <div id="ar-overlay" hidden>
+    <div class="topbar"><span>🌐 AR</span></div>
+    <p class="pill hint" id="ar-hint"></p>
+    <div class="bottombar" id="ar-buttons">
+      <button class="btn ghost" id="btn-ar-reset">↺ 置き直す</button>
+      <button class="btn ghost" id="btn-ar-exit">✕ 終わる</button>
+    </div>
+    <p class="pill tip">📹 撮影は Android の画面録画・スクリーンショットで</p>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+/* 色は暗い背景の上に白文字が基本。主ボタンの緑（#187a62）は白文字とのコントラスト約 5.3:1 */
+:root {
+  --accent: #187a62;
+  --overlay: rgba(0, 0, 0, 0.66);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; background: #16181b; color: #fff; overflow: hidden;
+  font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+
+.screen { position: fixed; inset: 0; }
+.stage { position: absolute; inset: 0; }
+.stage video, .stage canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+.studio { background: radial-gradient(circle at 50% 40%, #3a4250, #1b1f26 75%); }
+#preview-stage { bottom: 200px; } /* 下の設定パネルに 3D が隠れないようにする */
+#preview-stage canvas { object-fit: fill; touch-action: none; }
+
+.topbar {
+  position: absolute; top: 0; left: 0; right: 0; padding: 14px 16px 26px;
+  background: linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,0));
+  display: flex; justify-content: space-between; align-items: center; font-size: .95rem;
+  pointer-events: none;
+}
+.topbar button { pointer-events: auto; }
+.link { background: none; border: 0; color: #fff; font: inherit; padding: 4px 0; }
+
+.pill {
+  position: absolute; left: 50%; transform: translateX(-50%); margin: 0;
+  background: var(--overlay); padding: 9px 16px; border-radius: 999px; font-size: .9rem;
+  max-width: 92%; text-align: center; pointer-events: none;
+}
+.hint { top: 64px; }
+.msg { top: 112px; background: rgba(150, 30, 30, .85); }
+.tip { bottom: 92px; font-size: .78rem; }
+
+.bottombar {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 16px 22px;
+  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.72));
+  display: flex; justify-content: space-around; align-items: center; gap: 10px;
+}
+.btn {
+  border: 0; border-radius: 999px; padding: 12px 20px; font: inherit; font-size: .95rem; font-weight: 700;
+  background: rgba(255,255,255,.92); color: #222; cursor: pointer;
+}
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.ghost { background: rgba(0,0,0,.5); color: #fff; border: 1px solid rgba(255,255,255,.65); }
+.btn:disabled { opacity: .45; }
+
+.panel {
+  position: absolute; left: 12px; right: 12px; bottom: 92px;
+  background: rgba(255,255,255,.95); color: #222; border-radius: 16px; padding: 12px 14px; font-size: .9rem;
+}
+.panel label, .panel .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 6px 0; }
+.panel input[type=range] { width: 60%; accent-color: var(--accent); }
+.swatches { display: flex; gap: 10px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #888; padding: 0; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent); }
+.note { margin: 6px 0 0; font-size: .8rem; color: #8a2c1d; }
+.note:empty { display: none; }
+
+/* AR 中: DOM オーバーレイは全画面に重なる */
+#ar-overlay { position: fixed; inset: 0; }
+.ar-canvas { position: fixed; inset: 0; }
