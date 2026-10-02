@@ -68,17 +68,25 @@ function tapToSource(e, el, frame) {
 }
 
 // ---- ② 切り抜きの確認 ----
-function setConfirmMsg(text) { $('confirm-msg').textContent = text; }
+function setConfirmMsg(text, busy = false) {
+  $('confirm-msg').textContent = text;
+  $('confirm-msg').classList.toggle('busy', busy);
+}
+
+let segmenting = false; // 処理中のタップは受け付けない（結果の順番が入れ替わらないように）
 
 async function runSegment(point) {
+  if (segmenting) return;
+  segmenting = true;
+  const frame = state.frame;
   state.cutout = null;
   drawConfirm();
   $('btn-accept').disabled = true;
-  setConfirmMsg('切り抜き中…（端末の中だけで処理）');
-  // 文字を画面に出してから重い処理に入る
-  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+  setConfirmMsg('切り抜き中…（端末の中だけで処理）', true);
   try {
-    const { mask, width, height } = await segmentAt(state.frame, point);
+    const { mask, width, height, delegate, ms } = await segmentAt(frame, point);
+    console.info(`切り抜き: ${delegate} ${ms}ms（マスク ${width}x${height}）`); // 実機での速さの確認用
+    if (frame !== state.frame) return; // 処理中に撮り直された
     const ratio = coverage(mask);
     const cutout = ratio > 0.002 ? makeCutout(state.frame, mask, width, height) : null;
     if (!cutout) {
@@ -94,6 +102,8 @@ async function runSegment(point) {
   } catch (err) {
     console.error(err);
     setConfirmMsg('切り抜きの準備に失敗しました（通信を確認してください）');
+  } finally {
+    segmenting = false;
   }
 }
 

@@ -10,7 +10,10 @@ AI native 設計（サービス側は AI の料金を払わない・写真を預
 ## 構成
 - `js/app.js` 画面の切り替えとつなぎ込み
 - `js/camera.js` カメラ・1コマの取得・写真の読み込み
-- `js/segment.js` 切り抜き（MediaPipe Interactive Segmenter v2 / tasks-vision 1.0.1。端末内で動く）
+- `js/segment.js` 切り抜きの窓口（画面側）。写真を長い辺 768px に縮めて Worker に渡す
+- `js/segment-worker.js` 切り抜き本体（Web Worker。MediaPipe Interactive Segmenter v2 / tasks-vision 1.0.1。端末内で動く）
+  - モジュール Worker なので `forVisionTasks(場所, true)`（ES モジュール版 Wasm）が必須
+  - GPU 優先、失敗したら CPU。setImage は軽く、重いのは segment（タップし直しで速くはならない）
 - `js/geometry.js` 座標変換・マスク処理（純粋関数。`npm test`）
 - `js/cutout.js` 背景が透明な切り抜き画像を作る
 - `js/model3d.js` 厚みのある切り絵（板を重ねる方式）と床の影

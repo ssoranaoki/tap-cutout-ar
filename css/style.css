@@ -33,6 +33,14 @@ html, body {
   max-width: 92%; text-align: center; pointer-events: none;
 }
 .hint { top: 64px; }
+/* 切り抜き中: 回る輪（処理は Worker で動くので画面は固まらず、輪も回り続ける） */
+.busy::before {
+  content: ""; display: inline-block; width: .9em; height: .9em; margin-right: .5em; vertical-align: -.1em;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .busy::before { animation-duration: 2.4s; } }
 .msg { top: 112px; background: rgba(150, 30, 30, .85); }
 .tip { bottom: 92px; font-size: .78rem; }
 
