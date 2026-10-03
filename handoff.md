@@ -3,17 +3,20 @@
 （本来は `.claude/handoff.md` に置く方針。環境の制約で `.claude/` に書けなかったため、プロジェクト直下に置いている）
 
 ## 現在の状況
-- 試作 1 版を実装（Android の Chrome 向け）。GitHub Pages で公開済み: https://ssoranaoki.github.io/tap-cutout-ar/ （push はユーザーが Windows から）
-- 2026-10-03 Android 実機で全工程を確認済み: カメラでタップ→切り抜き／3D で回す・厚み・色／AR で白い輪→タップで置く／2本指で回す・拡大／画面録画で撮影
-- PC の Edge（Playwright）で確認済み: 写真から選ぶ → タップで切り抜き → 厚みのある切り絵の 3D を指で回す
-- 切り抜きを Web Worker に移した（処理中も画面は止まらない。くるくる回る印つき）。GPU 優先＋写真を 768px に縮めて 約5秒 → 約1.3〜1.5秒（PC）
-  - 実機の速さは Chrome のコンソールに「切り抜き: GPU 〇〇ms」と出る
-- AR（④）は PC では未対応表示になるため未確認。Android 実機で確認が必要
-- 確認時の注意: MulmoClaude の artifacts 配信は HTML 以外 404・CSP あり → Playwright の page.route で /api/files/raw?path=projects/tap-cutout-ar/... に差し替えて確認した
+- 試作 1 版: GitHub Pages で公開済み https://ssoranaoki.github.io/tap-cutout-ar/ （push はユーザーが Windows から `git push`）
+  - 2026-10-03 Android 実機で全工程を確認済み（切り抜き／3D／AR で置く／2本指／画面録画）
+- 切り抜きは Web Worker（GPU 優先・768px）。PC で約1.4秒。実機の速さは Chrome コンソールの「切り抜き: GPU 〇〇ms」
+- 2 版（AI native の本題）を実装・PC で確認済み・未 push:
+  - 渡す: 3D 画面の「🤖 自分の AI で裏側まである 3D にする」欄 → 画像を保存／Tripo を開く／AI アプリへ送る（お願い文つき）
+  - 受け取る: 「🧊 3D ファイルを開く」（撮影画面と 3D 画面）で GLB を読み込み → 大きさ・底・中心を自動でそろえる → 向きを直すボタン → AR
+  - PC で確認: Khronos のサンプル（Duck / DamagedHelmet）表示・向き直し・GLB でないファイルのエラー・PNG 保存
+- 確認方法の注意: MulmoClaude の artifacts 配信は HTML 以外 404・CSP あり → Playwright の context.route で /api/files/raw?path=projects/tap-cutout-ar/... に差し替え（キャッシュ無効化も）
 
 ## 次にやること
-1. 次の版の内容を決める（候補: 複数体を並べる／ふちのなめらかな立体／利用者の AI で作った本物の 3D を読み込む／iPhone 対応）
+1. ユーザーが `git push` → Android で確認: 画像を保存 → Tripo で 3D 化 → GLB をダウンロード → 3D ファイルを開く → 向き → AR
+2. Tripo の GLB の向き・大きさ・ファイルサイズを記録し、向きの初期値やお願い文を調整する
 
 ## 保留中の判断
 - アプリ名（仮: 切り抜きAR / tap-cutout-ar）
-- 複数体を並べる（次の版）、iPhone 対応（model-viewer + AR Quick Look）
+- app.js が約 310 行。次に大きく触るとき、AI 連携（渡す・受け取る）部分を別ファイルに分ける
+- 複数体を並べる、ふちのなめらかな立体、iPhone 対応（model-viewer + AR Quick Look）

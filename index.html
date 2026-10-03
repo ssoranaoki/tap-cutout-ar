@@ -28,8 +28,12 @@
       <label class="btn ghost">🖼 写真から選ぶ
         <input type="file" id="file-input" accept="image/*" hidden>
       </label>
+      <label class="btn ghost" for="glb-input">🧊 3D ファイルを開く</label>
     </div>
   </section>
+
+  <!-- 3D ファイル（GLB）の読み込み口。①と③のボタンから使う -->
+  <input type="file" id="glb-input" accept=".glb,model/gltf-binary,application/octet-stream" hidden>
 
   <!-- ② 切り抜きの確認 -->
   <section class="screen" id="screen-confirm" hidden>
@@ -50,15 +54,42 @@
     <div class="topbar">
       <button class="link" id="btn-preview-back">← 戻る</button><span>🧊 3D</span>
     </div>
-    <div class="panel">
-      <label>厚み <input type="range" id="thickness" min="1" max="10" value="4"></label>
-      <div class="row">ふちの色
-        <span class="swatches">
-          <button class="swatch" data-color="#b9732f" style="background:#b9732f" aria-pressed="true" aria-label="茶色"></button>
-          <button class="swatch" data-color="#ffffff" style="background:#ffffff" aria-pressed="false" aria-label="白"></button>
-          <button class="swatch" data-color="#2b2a27" style="background:#2b2a27" aria-pressed="false" aria-label="黒"></button>
-          <button class="swatch" data-color="#52b788" style="background:#52b788" aria-pressed="false" aria-label="緑"></button>
-        </span>
+    <div class="panel" id="preview-panel">
+      <!-- 切り絵のとき -->
+      <div id="panel-cutout">
+        <label>厚み <input type="range" id="thickness" min="1" max="10" value="4"></label>
+        <div class="row">ふちの色
+          <span class="swatches">
+            <button class="swatch" data-color="#b9732f" style="background:#b9732f" aria-pressed="true" aria-label="茶色"></button>
+            <button class="swatch" data-color="#ffffff" style="background:#ffffff" aria-pressed="false" aria-label="白"></button>
+            <button class="swatch" data-color="#2b2a27" style="background:#2b2a27" aria-pressed="false" aria-label="黒"></button>
+            <button class="swatch" data-color="#52b788" style="background:#52b788" aria-pressed="false" aria-label="緑"></button>
+          </span>
+        </div>
+        <div class="ai-box">
+          <p class="ai-title">🤖 自分の AI で「裏側まである 3D」にする</p>
+          <div class="ai-buttons">
+            <button class="chip" id="btn-save-png">💾 画像を保存</button>
+            <a class="chip" id="link-tripo" target="_blank" rel="noopener">Tripo を開く ↗</a>
+            <button class="chip" id="btn-share-ai">📤 AI アプリへ送る</button>
+          </div>
+          <p class="small">保存した画像を Tripo で 3D にし、GLB をダウンロード →
+            <label class="inline-link" for="glb-input">🧊 3D ファイルを開く</label></p>
+          <p class="small" id="ai-msg" aria-live="polite"></p>
+        </div>
+      </div>
+      <!-- 読み込んだ 3D ファイルのとき -->
+      <div id="panel-glb" hidden>
+        <p class="ai-title" id="glb-name"></p>
+        <div class="row">向きを直す
+          <span class="ai-buttons">
+            <button class="chip" id="btn-rot-y">↻ 横に回す</button>
+            <button class="chip" id="btn-rot-x">⤵ 起こす</button>
+            <button class="chip" id="btn-rot-reset">元に戻す</button>
+          </span>
+        </div>
+        <p class="small">AI によって向きがばらばらです。正面がこちらを向き、底が床に着くように直してください。</p>
+        <button class="chip" id="btn-back-cutout" hidden>✂️ 切り絵に戻る</button>
       </div>
       <p class="note" id="ar-msg"></p>
     </div>

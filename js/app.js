@@ -3,9 +3,11 @@ import { startCamera, stopCamera, grabFrame, loadImageFile } from './camera.js';
 import { loadSegmenter, segmentAt } from './segment.js';
 import { makeCutout } from './cutout.js';
 import { coverPointToSource, coverage } from './geometry.js';
-import { buildCutoutModel } from './model3d.js';
+import { buildCutoutModel, disposeModel } from './model3d.js';
 import { initPreview, showInPreview, startPreview, stopPreview } from './preview.js';
 import { isArSupported, startAr } from './ar.js';
+import { buildGlbModel, isGlb, MAX_GLB_BYTES } from './glb.js';
+import { TRIPO_URL, makeCutoutFile, saveFile, shareToAi } from './ai-share.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -15,6 +17,10 @@ const state = {
   thickness: 4,
   edgeColor: '#b9732f',
   arSupported: false,
+  source: 'cutout',       // 表示する 3D の元: 'cutout' | 'glb'
+  glb: null,              // { buffer, name, rotation: {x, y} }（利用者の AI で作った 3D）
+  cutoutFile: null,       // AI に渡す PNG（Promise）
+  cutoutFileReady: null,  // 同じ PNG（できあがったもの。共有ボタン用）
 };
 
 // ---- 画面の切り替え ----
@@ -134,14 +140,49 @@ $('confirm-canvas').addEventListener('click', (e) => {
 $('btn-retry').addEventListener('click', () => show('screen-camera'));
 $('btn-confirm-back').addEventListener('click', () => show('screen-camera'));
 $('btn-accept').addEventListener('click', () => {
-  rebuildPreview();
+  // 「AI アプリへ送る」用の画像ファイルを先に作っておく
+  state.cutoutFileReady = null;
+  state.cutoutFile = makeCutoutFile(state.cutout.canvas);
+  state.cutoutFile.then((f) => { state.cutoutFileReady = f; }).catch(() => {});
+  $('ai-msg').textContent = '';
+  setSource('cutout');
   show('screen-preview');
 });
 
 // ---- ③ 3D で確かめる ----
-function rebuildPreview() {
-  showInPreview(buildCutoutModel(state.cutout, { thickness: state.thickness, edgeColor: state.edgeColor }));
+// 表示する 3D の元: 'cutout'（切り絵）か 'glb'（利用者の AI で作った 3D ファイル）
+function makeModel() {
+  if (state.source === 'glb') return buildGlbModel(state.glb.buffer, state.glb.rotation);
+  return Promise.resolve(buildCutoutModel(state.cutout, { thickness: state.thickness, edgeColor: state.edgeColor }));
 }
+
+let previewVersion = 0;
+async function rebuildPreview() {
+  const version = ++previewVersion;
+  try {
+    const model = await makeModel();
+    if (version !== previewVersion) return; // 途中で別の 3D に切り替わった
+    showInPreview(model);
+  } catch (err) {
+    console.error(err);
+    $('ar-msg').textContent = '3D を表示できませんでした';
+  }
+}
+
+function setSource(source) {
+  state.source = source;
+  $('panel-cutout').hidden = source !== 'cutout';
+  $('panel-glb').hidden = source !== 'glb';
+  $('btn-back-cutout').hidden = !state.cutout;
+  resetArMsg();
+  rebuildPreview();
+}
+
+// 設定パネルの高さに合わせて、3D の表示範囲を空ける
+new ResizeObserver(() => {
+  const h = $('preview-panel').offsetHeight;
+  $('screen-preview').style.setProperty('--panel-space', `${h + 92 + 8}px`);
+}).observe($('preview-panel'));
 
 $('thickness').addEventListener('input', (e) => {
   state.thickness = Number(e.target.value);
@@ -154,12 +195,84 @@ for (const sw of document.querySelectorAll('.swatch')) {
     rebuildPreview();
   });
 }
-$('btn-preview-back').addEventListener('click', () => show('screen-confirm'));
+// 切り絵なら切り抜きの確認へ、読み込んだ 3D なら撮影へ戻る
+$('btn-preview-back').addEventListener('click', () => {
+  show(state.source === 'cutout' ? 'screen-confirm' : 'screen-camera');
+});
 
+const AR_UNSUPPORTED = 'この端末・ブラウザは AR に未対応です（Android の Chrome で開いてください）';
+function resetArMsg() {
+  $('ar-msg').textContent = state.arSupported ? '' : AR_UNSUPPORTED;
+}
+
+// ---- 自分の AI で「裏側まである 3D」にする（渡す） ----
+$('link-tripo').href = TRIPO_URL;
+const setAiMsg = (text) => { $('ai-msg').textContent = text; };
+
+$('btn-save-png').addEventListener('click', async () => {
+  try {
+    saveFile(await state.cutoutFile);
+    setAiMsg('画像を保存しました。Tripo の「Image to 3D」にアップロードしてください');
+  } catch {
+    setAiMsg('画像を保存できませんでした');
+  }
+});
+$('btn-share-ai').addEventListener('click', async () => {
+  // 共有はボタンを押した直後でないと止められるため、ファイルは先に作ってある（state.cutoutFileReady）
+  const file = state.cutoutFileReady;
+  if (!file) { setAiMsg('画像を準備中です。もう一度押してください'); return; }
+  try {
+    const r = await shareToAi(file);
+    if (r === 'saved') setAiMsg('この端末は共有に未対応のため、画像を保存し、お願い文をコピーしました');
+    if (r === 'shared') setAiMsg('できた GLB をダウンロードしたら「3D ファイルを開く」で読み込みます');
+  } catch {
+    setAiMsg('送れませんでした');
+  }
+});
+
+// ---- 自分の AI で作った 3D ファイルを読み込む（受け取る） ----
+$('glb-input').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  const fail = (text) => {
+    setCameraMsg(text);
+    $('ar-msg').textContent = text;
+  };
+  if (file.size > MAX_GLB_BYTES) {
+    fail(`ファイルが大きすぎます（${Math.round(file.size / 1024 / 1024)}MB）。60MB 以下にしてください`);
+    return;
+  }
+  const buffer = await file.arrayBuffer();
+  if (!isGlb(buffer)) {
+    fail('GLB 形式の 3D ファイルを選んでください（.glb）');
+    return;
+  }
+  const glb = { buffer, name: file.name, rotation: { x: 0, y: 0 } };
+  try {
+    await buildGlbModel(buffer).then(disposeModel); // 読めるかどうかを先に確かめる
+  } catch (err) {
+    console.error(err);
+    fail('この 3D ファイルは読み込めませんでした');
+    return;
+  }
+  state.glb = glb;
+  $('glb-name').textContent = `🧊 ${file.name}（あなたの AI で作った 3D）`;
+  setCameraMsg('');
+  setSource('glb');
+  show('screen-preview');
+});
+
+const QUARTER = Math.PI / 2;
+$('btn-rot-y').addEventListener('click', () => { state.glb.rotation.y += QUARTER; rebuildPreview(); });
+$('btn-rot-x').addEventListener('click', () => { state.glb.rotation.x += QUARTER; rebuildPreview(); });
+$('btn-rot-reset').addEventListener('click', () => { state.glb.rotation = { x: 0, y: 0 }; rebuildPreview(); });
+$('btn-back-cutout').addEventListener('click', () => setSource('cutout'));
+
+// ---- ④ AR で置く ----
 $('btn-ar').addEventListener('click', async () => {
   if (!state.arSupported) return;
   stopPreview();
-  const model = buildCutoutModel(state.cutout, { thickness: state.thickness, edgeColor: state.edgeColor });
   const ui = {
     overlay: $('ar-overlay'),
     hint: $('ar-hint'),
@@ -169,7 +282,7 @@ $('btn-ar').addEventListener('click', async () => {
   };
   ui.overlay.hidden = false;
   try {
-    await startAr(model, ui, () => {
+    await startAr(makeModel, ui, () => {
       ui.overlay.hidden = true;
       show('screen-preview');
     });
@@ -189,5 +302,5 @@ loadSegmenter().catch(() => setCameraMsg('切り抜き AI を読み込めませ�
 isArSupported().then((ok) => {
   state.arSupported = ok;
   $('btn-ar').disabled = !ok;
-  $('ar-msg').textContent = ok ? '' : 'この端末・ブラウザは AR に未対応です（Android の Chrome で開いてください）';
+  resetArMsg();
 });

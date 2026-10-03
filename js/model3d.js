@@ -2,6 +2,7 @@
 // 作り方: 同じ形の板を少しずつずらして重ね、厚みに見せる。
 //   表 = 写真、裏 = 写真（裏から見るので左右反転）、間の板 = ふちの色
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 export const DEFAULT_HEIGHT_M = 0.25; // AR で置いたときの最初の高さ（25cm）
 
@@ -86,6 +87,17 @@ export function buildContactShadow(width) {
   return mesh;
 }
 
+/**
+ * 部屋の照明（周りの景色の映り込み）。AI で作った 3D は質感（PBR）付きなので、これが無いと暗く・のっぺり見える
+ * renderer ごとに 1 回作る
+ */
+export function makeRoomEnvironment(renderer) {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+  return env;
+}
+
 /** 作り直すときに古い 3D のメモリを開放する */
 export function disposeModel(object) {
   const seen = new Set();
@@ -95,7 +107,10 @@ export function disposeModel(object) {
     for (const m of mats) {
       if (seen.has(m)) continue;
       seen.add(m);
-      if (m.map) m.map.dispose();
+      // AI で作った 3D は色以外にも凹凸・つや等の画像を持つので、画像はすべて開放する
+      for (const value of Object.values(m)) {
+        if (value?.isTexture && !seen.has(value)) { seen.add(value); value.dispose(); }
+      }
       m.dispose();
     }
   });

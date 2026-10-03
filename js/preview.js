@@ -1,7 +1,7 @@
 // ③ 3D で確かめる画面（指で回せるプレビュー）
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildContactShadow, disposeModel } from './model3d.js';
+import { buildContactShadow, disposeModel, makeRoomEnvironment } from './model3d.js';
 
 let renderer, scene, camera, controls, holder;
 
@@ -11,11 +11,13 @@ export function initPreview(container) {
   container.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
+  scene.environment = makeRoomEnvironment(renderer);
+  scene.environmentIntensity = 0.8;
   camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10);
   camera.position.set(0.25, 0.2, 0.6);
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.2));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.4));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.4);
   sun.position.set(0.5, 1, 0.8);
   scene.add(sun);
 
@@ -29,7 +31,7 @@ export function initPreview(container) {
   controls.target.set(0, 0.12, 0);
   controls.enableDamping = true;
   controls.autoRotate = true;
-  controls.autoRotateSpeed = 1.5;
+  controls.autoRotateSpeed = 1.5; // 1 秒あたり 1.5/60 周 → 約 40 秒で 1 周
   controls.minDistance = 0.2;
   controls.maxDistance = 1.5;
   controls.addEventListener('start', () => { controls.autoRotate = false; });
@@ -60,8 +62,12 @@ export function showInPreview(model) {
 
 export function startPreview() {
   controls.autoRotate = true;
-  renderer.setAnimationLoop(() => {
-    controls.update();
+  let last = null;
+  renderer.setAnimationLoop((time) => {
+    // 経過秒数を渡す（渡さないと画面の書き換え回数しだいで回る速さが変わる。120Hz の端末では倍速になる）
+    const delta = last === null ? 0 : Math.min(0.1, (time - last) / 1000);
+    last = time;
+    controls.update(delta);
     renderer.render(scene, camera);
   });
 }

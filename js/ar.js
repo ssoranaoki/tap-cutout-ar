@@ -1,7 +1,7 @@
 // ④ AR で置く（WebXR immersive-ar + hit-test。Android の Chrome 向け）
 // 参考: three.js r186 examples/webxr_ar_hittest.html
 import * as THREE from 'three';
-import { buildContactShadow, disposeModel } from './model3d.js';
+import { buildContactShadow, disposeModel, makeRoomEnvironment } from './model3d.js';
 
 export async function isArSupported() {
   if (!('xr' in navigator)) return false;
@@ -14,16 +14,26 @@ export async function isArSupported() {
 
 /**
  * AR を始める。ボタンを押した直後（ユーザー操作の中）で呼ぶこと。
- * model: buildCutoutModel で作った 3D（AR 専用に作ったもの。終了時に開放する）
+ * createModel: AR 専用の 3D を作る async 関数（終了時に開放する）。
+ *   GLB の読み込みは時間がかかり、待っている間にボタン操作の有効期限が切れて AR を始められなくなるため、
+ *   先に AR を始めてから 3D を作る。
  * ui: { overlay, hint, resetBtn, exitBtn }
  * onEnd: AR を終えたときに呼ばれる
  */
-export async function startAr(model, ui, onEnd) {
+export async function startAr(createModel, ui, onEnd) {
   const session = await navigator.xr.requestSession('immersive-ar', {
     requiredFeatures: ['hit-test'],
     optionalFeatures: ['dom-overlay'],
     domOverlay: { root: ui.overlay },
   });
+  ui.hint.textContent = '3D を準備中…';
+  let model;
+  try {
+    model = await createModel();
+  } catch (err) {
+    await session.end().catch(() => {});
+    throw err;
+  }
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -33,8 +43,10 @@ export async function startAr(model, ui, onEnd) {
   document.body.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
+  scene.environment = makeRoomEnvironment(renderer);
+  scene.environmentIntensity = 0.8;
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 2.5);
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.6);
   light.position.set(0.5, 1, 0.25);
   scene.add(light);
 
@@ -124,6 +136,7 @@ export async function startAr(model, ui, onEnd) {
     ui.overlay.removeEventListener('touchmove', onTouchMove);
     ui.overlay.removeEventListener('touchend', onTouchEnd);
     disposeModel(scene);
+    scene.environment?.dispose();
     renderer.dispose();
     renderer.domElement.remove();
     onEnd();

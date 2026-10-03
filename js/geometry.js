@@ -93,6 +93,27 @@ export function maskBounds(mask, width, height, padRatio = 0.04) {
   return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
+/**
+ * 読み込んだ 3D の大きさ・位置をそろえる計算。
+ * min / max: 3D 全体を囲む箱の角（{x,y,z}）。heightM: そろえたい高さ（メートル）
+ * 戻り値: scale（拡大率）、offset（拡大する前に足す移動量。底を y=0、中心を x=z=0 にする）、
+ *         width（床の影に使う横幅。拡大後）
+ * どの AI で作った 3D でも、同じ大きさ・同じ置き方になるようにするためのもの。
+ */
+export function fitToHeight(min, max, heightM) {
+  const size = { x: max.x - min.x, y: max.y - min.y, z: max.z - min.z };
+  const longest = Math.max(size.x, size.y, size.z);
+  if (!(longest > 0)) return null; // 空っぽ・壊れた 3D
+  // ふつうは高さで合わせる。ぺちゃんこな物（高さがほぼ 0）は一番長い辺で合わせる
+  const base = size.y > longest * 0.05 ? size.y : longest;
+  const scale = heightM / base;
+  return {
+    scale,
+    offset: { x: -(min.x + max.x) / 2, y: -min.y, z: -(min.z + max.z) / 2 },
+    width: Math.max(size.x, size.z) * scale,
+  };
+}
+
 /** マスク全体に対して、切り抜いた部分が占める割合（小さすぎる・大きすぎるの判定用） */
 export function coverage(mask) {
   let n = 0;

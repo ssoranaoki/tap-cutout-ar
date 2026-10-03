@@ -1,6 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coverPointToSource, keepConnectedRegion, maskBounds, coverage } from '../js/geometry.js';
+import { coverPointToSource, keepConnectedRegion, maskBounds, coverage, fitToHeight } from '../js/geometry.js';
+
+test('3D をそろえる: 高さ 2 の物を 0.25m に。底が y=0、中心が x=z=0', () => {
+  const f = fitToHeight({ x: 1, y: -1, z: 3 }, { x: 3, y: 1, z: 5 }, 0.25);
+  assert.equal(f.scale, 0.125);
+  assert.deepEqual(f.offset, { x: -2, y: 1, z: -4 });
+  assert.equal(f.width, 0.25);
+});
+
+test('3D をそろえる: ぺちゃんこな物は一番長い辺で合わせる', () => {
+  const f = fitToHeight({ x: 0, y: 0, z: 0 }, { x: 4, y: 0.01, z: 2 }, 0.25);
+  assert.equal(f.scale, 0.0625);
+});
+
+test('3D をそろえる: 大きさが 0 なら null', () => {
+  assert.equal(fitToHeight({ x: 1, y: 1, z: 1 }, { x: 1, y: 1, z: 1 }, 0.25), null);
+});
 
 test('cover 表示: 縦長の画面に横長の映像。中央をタップすると映像の中央', () => {
   const p = coverPointToSource(180, 400, 360, 800, 1280, 720);
