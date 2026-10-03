@@ -1,8 +1,9 @@
 // 画面の切り替えと、各部品のつなぎ込み
 import { startCamera, stopCamera, grabFrame, loadImageFile } from './camera.js';
-import { loadSegmenter, segmentAt } from './segment.js';
+import { loadSegmenter, segmentStrokes } from './segment.js';
 import { makeCutout } from './cutout.js';
-import { coverPointToSource, coverage } from './geometry.js';
+import { coverPointToSource, coverage, gestureToStrokes, thinPoints } from './geometry.js';
+import { attachStrokeInput } from './stroke-input.js';
 import { buildCutoutModel, disposeModel } from './model3d.js';
 import { initPreview, showInPreview, startPreview, stopPreview } from './preview.js';
 import { isArSupported, startAr } from './ar.js';
@@ -49,7 +50,7 @@ $('camera-stage').addEventListener('click', (e) => {
   const point = tapToSource(e, $('camera-stage'), frame);
   state.frame = frame;
   show('screen-confirm');
-  runSegment(point);
+  runSegment(gestureToStrokes([point], frame.width / frame.height));
 });
 
 $('file-input').addEventListener('change', async (e) => {
@@ -64,7 +65,7 @@ $('file-input').addEventListener('change', async (e) => {
   }
   state.cutout = null;
   drawConfirm();
-  setConfirmMsg('切り抜きたい物をタップ');
+  setConfirmMsg(CONFIRM_HELP);
   show('screen-confirm');
 });
 
@@ -79,9 +80,11 @@ function setConfirmMsg(text, busy = false) {
   $('confirm-msg').classList.toggle('busy', busy);
 }
 
+const CONFIRM_HELP = '物をタップ。うまくいかなければ、なぞる・ぐるっと囲む';
 let segmenting = false; // 処理中のタップは受け付けない（結果の順番が入れ替わらないように）
 
-async function runSegment(point) {
+/** gesture: gestureToStrokes の結果（{ kind, strokes, seed }） */
+async function runSegment(gesture) {
   if (segmenting) return;
   segmenting = true;
   const frame = state.frame;
@@ -90,26 +93,29 @@ async function runSegment(point) {
   $('btn-accept').disabled = true;
   setConfirmMsg('切り抜き中…（端末の中だけで処理）', true);
   try {
-    const { mask, width, height, delegate, ms } = await segmentAt(frame, point);
-    console.info(`切り抜き: ${delegate} ${ms}ms（マスク ${width}x${height}）`); // 実機での速さの確認用
+    const { mask, width, height, delegate, ms } = await segmentStrokes(frame, gesture.strokes, gesture.seed);
+    console.info(`切り抜き(${gesture.kind}): ${delegate} ${ms}ms（マスク ${width}x${height}）`); // 実機での確認用
     if (frame !== state.frame) return; // 処理中に撮り直された
     const ratio = coverage(mask);
     const cutout = ratio > 0.002 ? makeCutout(state.frame, mask, width, height) : null;
     if (!cutout) {
-      setConfirmMsg('うまく切り抜けませんでした。物の真ん中をタップし直してください');
+      setConfirmMsg(gesture.kind === 'lasso'
+        ? 'うまく切り抜けませんでした。物の上を指でなぞってみてください'
+        : 'うまく切り抜けませんでした。物のまわりをぐるっと囲んでみてください');
       return;
     }
     state.cutout = cutout;
     drawConfirm();
     $('btn-accept').disabled = false;
     setConfirmMsg(ratio > 0.6
-      ? '背景まで入っているかもしれません。違ったら別の場所をタップ'
-      : '✓ 切り抜けました。違ったら別の場所をタップ');
+      ? '背景まで入っているかもしれません。違ったら、なぞる・囲むでやり直し'
+      : '✓ 切り抜けました。違ったら、なぞる・囲むでやり直し');
   } catch (err) {
     console.error(err);
     setConfirmMsg('切り抜きの準備に失敗しました（通信を確認してください）');
   } finally {
     segmenting = false;
+    strokeInput.clear();
   }
 }
 
@@ -133,10 +139,17 @@ function drawConfirm() {
   }
 }
 
-$('confirm-canvas').addEventListener('click', (e) => {
-  if (!state.frame) return;
-  runSegment(tapToSource(e, $('confirm-canvas'), state.frame));
-});
+// タップ・なぞる・囲う を受け取り、写真上の位置に直して切り抜く
+const strokeInput = attachStrokeInput(
+  $('confirm-stage'),
+  $('stroke-canvas'),
+  (points, rect) => {
+    const f = state.frame;
+    const src = points.map((p) => coverPointToSource(p.x, p.y, rect.width, rect.height, f.width, f.height));
+    runSegment(gestureToStrokes(thinPoints(src), f.width / f.height));
+  },
+  () => !!state.frame && !segmenting,
+);
 $('btn-retry').addEventListener('click', () => show('screen-camera'));
 $('btn-confirm-back').addEventListener('click', () => show('screen-camera'));
 $('btn-accept').addEventListener('click', () => {

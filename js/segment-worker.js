@@ -9,8 +9,8 @@ const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wa
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/1/interactive_segmentation.task';
 
-// d.ts の enum BrushMode は配布ファイルから export されていないため数値で指定する（1 = POSITIVE）
-const BRUSH_POSITIVE = 1;
+// d.ts の enum BrushMode は配布ファイルから export されていないため、数値で渡す（geometry.js の BRUSH）
+// 注意: 点 1 つの指示では AI がほとんど反応しない。線にして渡すこと（geometry.js の gestureToStrokes）
 
 let segmenterPromise = null;
 let delegate = 'GPU';
@@ -45,11 +45,13 @@ async function switchToCpu() {
   return loadSegmenter();
 }
 
-function runOnce(segmenter, bitmap, point) {
+/**
+ * strokes: [{ brushMode, point: [{x,y},...] }]（0〜1 の座標）。brushMode: 1 = POSITIVE, 2 = NEGATIVE, 3 = LASSO
+ * point: 切り抜いた塊のうち、どれを残すかの目印（タップ位置・なぞった線の中心など）
+ */
+function runOnce(segmenter, bitmap, strokes, point) {
   segmenter.setImage(bitmap);
-  const mpMask = segmenter.segment([
-    { brushMode: BRUSH_POSITIVE, point: [{ x: point.x, y: point.y }], isCompleted: true },
-  ]);
+  const mpMask = segmenter.segment(strokes.map((s) => ({ ...s, isCompleted: true })));
   try {
     const { width, height } = mpMask;
     let values = mpMask.getAsFloat32Array();
@@ -72,14 +74,15 @@ self.onmessage = async (e) => {
       return;
     }
     if (type === 'segment') {
-      const { bitmap, point } = e.data;
+      const { bitmap, point, strokes } = e.data;
+      if (!strokes?.length) throw new Error('切り抜く場所の指示がありません');
       const t0 = performance.now();
       let result;
       try {
-        result = runOnce(await loadSegmenter(), bitmap, point);
+        result = runOnce(await loadSegmenter(), bitmap, strokes, point);
       } catch (err) {
         if (delegate !== 'GPU') throw err;
-        result = runOnce(await switchToCpu(), bitmap, point);
+        result = runOnce(await switchToCpu(), bitmap, strokes, point);
       } finally {
         bitmap.close();
       }

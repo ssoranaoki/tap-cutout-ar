@@ -47,12 +47,17 @@ export function loadSegmenter() {
  * canvas に描いた 1 コマと、タップ位置（0〜1）から、切り抜きマスクを作る。
  * 戻り値: { mask: Uint8Array(0/1), width, height, delegate, ms }（マスクの解像度は canvas より小さいことがある）
  */
-export async function segmentAt(canvas, point) {
+/**
+ * 線（strokes）で切り抜く。タップ・なぞる・囲う は geometry.js の gestureToStrokes で strokes に変えてから渡す
+ * （点 1 つの指示では AI がほとんど反応しないため、タップも短い線にしてある）。
+ * point は「切り抜いた塊のうちどれを残すか」の目印。
+ */
+export async function segmentStrokes(canvas, strokes, point) {
   const scale = Math.min(1, SEGMENT_MAX_SIDE / Math.max(canvas.width, canvas.height));
   const bitmap = await createImageBitmap(canvas, {
     resizeWidth: Math.max(1, Math.round(canvas.width * scale)),
     resizeHeight: Math.max(1, Math.round(canvas.height * scale)),
     resizeQuality: 'high',
   });
-  return request({ type: 'segment', bitmap, point }, [bitmap]);
+  return request({ type: 'segment', bitmap, point, strokes }, [bitmap]);
 }

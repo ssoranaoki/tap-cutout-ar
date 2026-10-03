@@ -114,6 +114,50 @@ export function fitToHeight(min, max, heightM) {
   };
 }
 
+// 切り抜き AI（Interactive Segmenter v2）への指示の種類
+export const BRUSH = { POSITIVE: 1, NEGATIVE: 2, LASSO: 3 };
+
+/**
+ * 指の動き（0〜1 の座標の列）を、切り抜き AI への指示に変える。
+ * - ほとんど動いていない → タップ。点 1 つだと AI がほとんど反応しないため（実験で 5 件中 4 件が空）、
+ *   タップ位置を中心にした短い横線（±1%）にして渡す（同じ実験で 5 件とも成功）
+ * - 始点と終点が近く、ある程度の大きさがある → 囲う（LASSO）
+ * - それ以外 → なぞる（POSITIVE の線）
+ * aspect: 写真の 幅 / 高さ（距離を正しく測るため）
+ * 戻り値: { kind: 'tap' | 'scribble' | 'lasso', strokes, seed }（seed = 残す塊を選ぶ目印）
+ */
+export function gestureToStrokes(points, aspect = 1) {
+  const dist = (a, b) => Math.hypot((a.x - b.x) * aspect, a.y - b.y);
+  let length = 0;
+  for (let i = 1; i < points.length; i++) length += dist(points[i - 1], points[i]);
+  const first = points[0];
+  const last = points[points.length - 1];
+
+  if (points.length < 2 || length < 0.02) {
+    const p = last;
+    const d = 0.01;
+    return {
+      kind: 'tap',
+      strokes: [{ brushMode: BRUSH.POSITIVE, point: [{ x: clamp01(p.x - d), y: p.y }, { x: p.x, y: p.y }, { x: clamp01(p.x + d), y: p.y }] }],
+      seed: p,
+    };
+  }
+  const closed = dist(first, last) < Math.max(0.05, length * 0.2) && length > 0.15;
+  if (closed) {
+    const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+    const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+    return { kind: 'lasso', strokes: [{ brushMode: BRUSH.LASSO, point: points }], seed: { x: cx, y: cy } };
+  }
+  return { kind: 'scribble', strokes: [{ brushMode: BRUSH.POSITIVE, point: points }], seed: first };
+}
+
+/** 長い指の動きを間引く（送るデータを小さくする）。最初と最後は必ず残す */
+export function thinPoints(points, maxCount = 64) {
+  if (points.length <= maxCount) return points;
+  const step = (points.length - 1) / (maxCount - 1);
+  return Array.from({ length: maxCount }, (_, i) => points[Math.round(i * step)]);
+}
+
 /** マスク全体に対して、切り抜いた部分が占める割合（小さすぎる・大きすぎるの判定用） */
 export function coverage(mask) {
   let n = 0;

@@ -1,6 +1,52 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coverPointToSource, keepConnectedRegion, maskBounds, coverage, fitToHeight } from '../js/geometry.js';
+import { coverPointToSource, keepConnectedRegion, maskBounds, coverage, fitToHeight, gestureToStrokes, thinPoints, BRUSH } from '../js/geometry.js';
+
+test('指の動き: ほとんど動かなければタップ。点 1 つではなく短い横線にする', () => {
+  const g = gestureToStrokes([{ x: 0.5, y: 0.5 }, { x: 0.505, y: 0.5 }]);
+  assert.equal(g.kind, 'tap');
+  assert.equal(g.strokes[0].brushMode, BRUSH.POSITIVE);
+  assert.equal(g.strokes[0].point.length, 3);
+  assert.ok(Math.abs(g.strokes[0].point[0].x - 0.495) < 1e-9);
+  assert.ok(Math.abs(g.strokes[0].point[2].x - 0.515) < 1e-9);
+});
+
+test('指の動き: 端でのタップも線が 0〜1 からはみ出さない', () => {
+  const g = gestureToStrokes([{ x: 0.995, y: 0.2 }]);
+  assert.equal(g.strokes[0].point[2].x, 1);
+});
+
+test('指の動き: ぐるっと一周すれば囲う（LASSO）。目印は真ん中', () => {
+  const pts = Array.from({ length: 20 }, (_, i) => {
+    const a = (i / 19) * Math.PI * 2;
+    return { x: 0.5 + 0.1 * Math.cos(a), y: 0.5 + 0.1 * Math.sin(a) };
+  });
+  const g = gestureToStrokes(pts);
+  assert.equal(g.kind, 'lasso');
+  assert.equal(g.strokes[0].brushMode, BRUSH.LASSO);
+  assert.ok(Math.abs(g.seed.x - 0.5) < 0.02 && Math.abs(g.seed.y - 0.5) < 0.02);
+});
+
+test('指の動き: 一筆の線ならなぞる（POSITIVE の線）。目印は書き始め', () => {
+  const g = gestureToStrokes([{ x: 0.3, y: 0.3 }, { x: 0.4, y: 0.4 }, { x: 0.5, y: 0.5 }]);
+  assert.equal(g.kind, 'scribble');
+  assert.equal(g.strokes[0].brushMode, BRUSH.POSITIVE);
+  assert.deepEqual(g.seed, { x: 0.3, y: 0.3 });
+});
+
+test('指の動き: 横長の写真では横方向の距離を広く数える', () => {
+  // 横に 0.012 動いただけでも、幅/高さ = 2 なら 0.024 → タップではなくなぞる
+  const g = gestureToStrokes([{ x: 0.5, y: 0.5 }, { x: 0.512, y: 0.5 }], 2);
+  assert.equal(g.kind, 'scribble');
+});
+
+test('点を間引く: 最初と最後は残し、指定の数にする', () => {
+  const pts = Array.from({ length: 200 }, (_, i) => ({ x: i, y: 0 }));
+  const t = thinPoints(pts, 10);
+  assert.equal(t.length, 10);
+  assert.equal(t[0].x, 0);
+  assert.equal(t[9].x, 199);
+});
 
 test('3D をそろえる: 高さ 2 の物を 0.25m に。底が y=0、中心が x=z=0', () => {
   const f = fitToHeight({ x: 1, y: -1, z: 3 }, { x: 3, y: 1, z: 5 }, 0.25);

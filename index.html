@@ -37,7 +37,10 @@
 
   <!-- ② 切り抜きの確認 -->
   <section class="screen" id="screen-confirm" hidden>
-    <div class="stage"><canvas id="confirm-canvas"></canvas></div>
+    <div class="stage" id="confirm-stage">
+      <canvas id="confirm-canvas"></canvas>
+      <canvas id="stroke-canvas" aria-hidden="true"></canvas>
+    </div>
     <div class="topbar">
       <button class="link" id="btn-confirm-back">← 戻る</button><span>✂️ 切り抜き</span>
     </div>
