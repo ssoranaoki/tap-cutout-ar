@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coverPointToSource, keepConnectedRegion, maskBounds, coverage, fitToHeight, gestureToStrokes, thinPoints, BRUSH } from '../js/geometry.js';
+import { coverPointToSource, keepConnectedRegion, maskBounds, coverage, fitToHeight, gestureToStrokes, thinPoints, BRUSH, reliefHeights } from '../js/geometry.js';
 
 test('指の動き: ほとんど動かなければタップ。点 1 つではなく短い横線にする', () => {
   const g = gestureToStrokes([{ x: 0.5, y: 0.5 }, { x: 0.505, y: 0.5 }]);
@@ -38,6 +38,31 @@ test('指の動き: 横長の写真では横方向の距離を広く数える', 
   // 横に 0.012 動いただけでも、幅/高さ = 2 なら 0.024 → タップではなくなぞる
   const g = gestureToStrokes([{ x: 0.5, y: 0.5 }, { x: 0.512, y: 0.5 }], 2);
   assert.equal(g.kind, 'scribble');
+});
+
+test('浮き彫り: 切り抜いていない所は 0。手前ほど高く、ふちはなだらかに低い', () => {
+  // 21×21 の格子。真ん中の 15×15 が切り抜き部分。奥行きは右ほど手前
+  const N = 21;
+  const alpha = new Uint8Array(N * N);
+  const depth = new Uint8Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    if (x >= 3 && x < 18 && y >= 3 && y < 18) alpha[y * N + x] = 255;
+    depth[y * N + x] = x * 10;
+  }
+  const h = reliefHeights(depth, N, N, alpha, N, N, N, N, { edgeCells: 3 });
+  assert.equal(h[0], 0); // 外側
+  const row = 10;
+  const edge = h[row * N + 3];
+  const left = h[row * N + 7];
+  const right = h[row * N + 14];
+  assert.ok(edge < left, 'ふちは内側より低い');
+  assert.ok(right > left, '手前（右）ほど高い');
+  assert.ok(Math.max(...h) <= 1);
+});
+
+test('浮き彫り: 切り抜き部分が無ければ全部 0', () => {
+  const h = reliefHeights(new Uint8Array(4), 2, 2, new Uint8Array(4), 2, 2, 3, 3);
+  assert.deepEqual([...h], new Array(9).fill(0));
 });
 
 test('点を間引く: 最初と最後は残し、指定の数にする', () => {

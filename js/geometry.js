@@ -158,6 +158,84 @@ export function thinPoints(points, maxCount = 64) {
   return Array.from({ length: maxCount }, (_, i) => points[Math.round(i * step)]);
 }
 
+/**
+ * 浮き彫りの高さ（0〜1）を、格子の点ごとに計算する。
+ * depth: 奥行き（0〜255、大きいほど手前。dw×dh）、alpha: 切り抜きの透明度（0〜255。aw×ah）
+ * 両方とも同じ範囲（切り抜いた四角）を表す。gw×gh: 格子の点の数（上の行から、左から右へ並ぶ）
+ * - 切り抜いた部分の奥行きを、下位 5%〜上位 95% の幅で 0〜1 に引き伸ばす（物の中の凹凸だけを使う）
+ * - ふちから edgeCells マス以内はなだらかに低くして、板とつなげる（崖にしない）
+ * - 全体を少しふくらませる（base）。奥行きが平らな物でも丸みが出る
+ */
+export function reliefHeights(depth, dw, dh, alpha, aw, ah, gw, gh, { edgeCells = 6, base = 0.25 } = {}) {
+  const n = gw * gh;
+  const inside = new Uint8Array(n);
+  const d = new Float32Array(n);
+  const samples = [];
+  for (let iy = 0; iy < gh; iy++) {
+    for (let ix = 0; ix < gw; ix++) {
+      const u = gw > 1 ? ix / (gw - 1) : 0.5;
+      const v = gh > 1 ? iy / (gh - 1) : 0.5;
+      const i = iy * gw + ix;
+      const a = alpha[Math.min(ah - 1, Math.round(v * (ah - 1))) * aw + Math.min(aw - 1, Math.round(u * (aw - 1)))];
+      if (a < 128) continue;
+      inside[i] = 1;
+      d[i] = sampleBilinear(depth, dw, dh, u, v);
+      samples.push(d[i]);
+    }
+  }
+  const out = new Float32Array(n);
+  if (!samples.length) return out;
+  samples.sort((x, y) => x - y);
+  const lo = samples[Math.floor(samples.length * 0.05)];
+  const hi = samples[Math.min(samples.length - 1, Math.floor(samples.length * 0.95))];
+  const range = hi - lo || 1;
+
+  const dist = distanceToEdge(inside, gw, gh);
+  for (let i = 0; i < n; i++) {
+    if (!inside[i]) continue;
+    const t = Math.min(1, Math.max(0, (d[i] - lo) / range));
+    const e = Math.min(1, dist[i] / edgeCells);
+    const fall = e * e * (3 - 2 * e); // なめらかに 0→1
+    out[i] = fall * (base + (1 - base) * t);
+  }
+  return out;
+}
+
+function sampleBilinear(img, w, h, u, v) {
+  const x = u * (w - 1);
+  const y = v * (h - 1);
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1);
+  const fx = x - x0, fy = y - y0;
+  const top = img[y0 * w + x0] * (1 - fx) + img[y0 * w + x1] * fx;
+  const bottom = img[y1 * w + x0] * (1 - fx) + img[y1 * w + x1] * fx;
+  return top * (1 - fy) + bottom * fy;
+}
+
+/** 内側の各点から、いちばん近い外側（または画像の端）までのおおよその距離（マス数） */
+function distanceToEdge(inside, w, h) {
+  const INF = 1e9;
+  const dist = new Float32Array(w * h);
+  for (let i = 0; i < dist.length; i++) dist[i] = inside[i] ? INF : 0;
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : dist[y * w + x]);
+  const D = Math.SQRT2;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!dist[i]) continue;
+      dist[i] = Math.min(dist[i], at(x - 1, y) + 1, at(x, y - 1) + 1, at(x - 1, y - 1) + D, at(x + 1, y - 1) + D);
+    }
+  }
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      if (!dist[i]) continue;
+      dist[i] = Math.min(dist[i], at(x + 1, y) + 1, at(x, y + 1) + 1, at(x + 1, y + 1) + D, at(x - 1, y + 1) + D);
+    }
+  }
+  return dist;
+}
+
 /** マスク全体に対して、切り抜いた部分が占める割合（小さすぎる・大きすぎるの判定用） */
 export function coverage(mask) {
   let n = 0;
