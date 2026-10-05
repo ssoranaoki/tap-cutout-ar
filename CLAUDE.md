@@ -18,6 +18,9 @@ AI native 設計（サービス側は AI の料金を払わない・写真を預
 - `js/stroke-input.js` ② 確認画面の指の動き（タップ・なぞる・囲う）を受け取り、線を描く
 - `js/cutout.js` 背景が透明な切り抜き画像を作る
 - `js/model3d.js` 厚みのある切り絵（板を重ねる方式）・床の影・部屋の照明（RoomEnvironment）
+- `js/depth.js` 写真の奥行き推定（Depth Anything V2 small / Transformers.js 4.3.0。WebGPU＋q4f16 約18MB、無ければ wasm＋q8 約25MB）
+- `js/relief.js` 浮き彫り（切り絵の表の板を、奥行きで盛り上げた面に差し替える）。高さの計算は geometry.js の `reliefHeights`
+- `js/shape-panel.js` ③ の「形: 切り絵／浮き彫り」欄。depth.js は浮き彫りを選んだときに初めて import する
 - `js/ai-share.js` 自分の AI へ「渡す」: 切り抜き PNG の保存・共有＋お願い文（AI は呼ばない）
 - `js/glb.js` 自分の AI から「受け取る」: GLB を読み込み（Draco / meshopt 対応）、高さ 25cm・底 y=0・中心にそろえる
 - `js/preview.js` 3D プレビュー（OrbitControls）

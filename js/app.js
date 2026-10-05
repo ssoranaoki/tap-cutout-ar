@@ -4,6 +4,8 @@ import { loadSegmenter, segmentStrokes } from './segment.js';
 import { makeCutout } from './cutout.js';
 import { coverPointToSource, coverage, gestureToStrokes, thinPoints } from './geometry.js';
 import { attachStrokeInput } from './stroke-input.js';
+import { buildReliefModel } from './relief.js';
+import { initShapePanel, resetShape, currentRelief } from './shape-panel.js';
 import { buildCutoutModel, disposeModel } from './model3d.js';
 import { initPreview, showInPreview, startPreview, stopPreview } from './preview.js';
 import { isArSupported, startAr } from './ar.js';
@@ -158,6 +160,7 @@ $('btn-accept').addEventListener('click', () => {
   state.cutoutFile = makeCutoutFile(state.cutout.canvas);
   state.cutoutFile.then((f) => { state.cutoutFileReady = f; }).catch(() => {});
   $('ai-msg').textContent = '';
+  resetShape(state.frame, state.cutout);
   setSource('cutout');
   show('screen-preview');
 });
@@ -166,7 +169,11 @@ $('btn-accept').addEventListener('click', () => {
 // 表示する 3D の元: 'cutout'（切り絵）か 'glb'（利用者の AI で作った 3D ファイル）
 function makeModel() {
   if (state.source === 'glb') return buildGlbModel(state.glb.buffer, state.glb.rotation);
-  return Promise.resolve(buildCutoutModel(state.cutout, { thickness: state.thickness, edgeColor: state.edgeColor }));
+  const opts = { thickness: state.thickness, edgeColor: state.edgeColor };
+  const relief = currentRelief(); // 浮き彫りを選んでいて、奥行きの計算が済んでいれば
+  return Promise.resolve(relief
+    ? buildReliefModel(state.cutout, relief.depth, { ...opts, strength: relief.strength })
+    : buildCutoutModel(state.cutout, opts));
 }
 
 let previewVersion = 0;
@@ -309,6 +316,7 @@ $('btn-ar').addEventListener('click', async () => {
 
 // ---- 起動 ----
 initPreview($('preview-stage'));
+initShapePanel(() => rebuildPreview());
 show('screen-camera');
 // モデルは裏で先に読み込んでおく（最初のタップを速くする）
 loadSegmenter().catch(() => setCameraMsg('切り抜き AI を読み込めませんでした。通信を確認してください'));

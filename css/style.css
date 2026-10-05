@@ -83,6 +83,14 @@ html, body {
 .small:empty { display: none; }
 .inline-link { color: var(--accent); font-weight: 700; text-decoration: underline; cursor: pointer; }
 #btn-back-cutout { margin-top: 8px; }
+/* 形の切り替え: 選んでいる方を緑で塗る（白文字とのコントラスト約 5.3:1） */
+.shape-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+/* 白いパネルの中の「計算中」の回る輪（濃い色） */
+.busy-dark::before {
+  content: ""; display: inline-block; width: .9em; height: .9em; margin-right: .5em; vertical-align: -.1em;
+  border: 2px solid rgba(0,0,0,.2); border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
 .note:empty { display: none; }
 
 /* AR 中: DOM オーバーレイは全画面に重なる */

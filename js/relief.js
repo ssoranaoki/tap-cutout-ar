@@ -9,9 +9,10 @@ const GRID = 160; // 盛り上げる面の細かさ（長い辺の分割数）
 /**
  * cutout: { canvas, aspect }（背景が透明な切り抜き画像）
  * depth: { data, width, height }（切り抜き画像と同じ範囲の奥行き。0〜255 で大きいほど手前）
- * strength: 盛り上がりの強さ（高さに対する割合。0.2 = 高さ 25cm なら最大 5cm）
+ * strength: 盛り上がりの強さ（高さに対する割合。0.06 = 高さ 25cm なら最大 1.5cm）
+ *   強くすると横から見たとき写真が引き伸ばされて目立つため、控えめを既定にする（見本で 0.2 は強すぎた）
  */
-export function buildReliefModel(cutout, depth, { strength = 0.2, thickness = 4, edgeColor = '#b9732f' } = {}) {
+export function buildReliefModel(cutout, depth, { strength = 0.06, thickness = 4, edgeColor = '#b9732f' } = {}) {
   const group = buildCutoutModel(cutout, { thickness, edgeColor });
   const { width: w, height: h, depth: plateDepth } = group.userData;
 

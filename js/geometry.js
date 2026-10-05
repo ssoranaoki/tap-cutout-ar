@@ -166,7 +166,7 @@ export function thinPoints(points, maxCount = 64) {
  * - ふちから edgeCells マス以内はなだらかに低くして、板とつなげる（崖にしない）
  * - 全体を少しふくらませる（base）。奥行きが平らな物でも丸みが出る
  */
-export function reliefHeights(depth, dw, dh, alpha, aw, ah, gw, gh, { edgeCells = 6, base = 0.25 } = {}) {
+export function reliefHeights(depth, dw, dh, alpha, aw, ah, gw, gh, { edgeCells = 12, base = 0.25, smooth = 2 } = {}) {
   const n = gw * gh;
   const inside = new Uint8Array(n);
   const d = new Float32Array(n);
@@ -198,7 +198,26 @@ export function reliefHeights(depth, dw, dh, alpha, aw, ah, gw, gh, { edgeCells 
     const fall = e * e * (3 - 2 * e); // なめらかに 0→1
     out[i] = fall * (base + (1 - base) * t);
   }
+  // 細かいでこぼこをならす（急な斜面ほど写真が横に引き伸ばされて見えるため）
+  for (let k = 0; k < smooth; k++) smoothInside(out, inside, gw, gh);
   return out;
+}
+
+/** 内側の点だけ、上下左右との平均でならす（外側は 0 のまま） */
+function smoothInside(values, inside, w, h) {
+  const src = Float32Array.from(values);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!inside[i]) continue;
+      let sum = src[i] * 2, cnt = 2;
+      if (x > 0) { sum += src[i - 1]; cnt++; }
+      if (x < w - 1) { sum += src[i + 1]; cnt++; }
+      if (y > 0) { sum += src[i - w]; cnt++; }
+      if (y < h - 1) { sum += src[i + w]; cnt++; }
+      values[i] = sum / cnt;
+    }
+  }
 }
 
 function sampleBilinear(img, w, h, u, v) {

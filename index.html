@@ -60,6 +60,14 @@
     <div class="panel" id="preview-panel">
       <!-- 切り絵のとき -->
       <div id="panel-cutout">
+        <div class="row">形
+          <span class="ai-buttons">
+            <button class="chip shape-btn" data-shape="flat" aria-pressed="true">切り絵</button>
+            <button class="chip shape-btn" data-shape="relief" aria-pressed="false">浮き彫り</button>
+          </span>
+        </div>
+        <label id="relief-row" hidden>盛り上がり <input type="range" id="relief-strength" min="1" max="10" value="4"></label>
+        <p class="small" id="shape-status" aria-live="polite"></p>
         <label>厚み <input type="range" id="thickness" min="1" max="10" value="4"></label>
         <div class="row">ふちの色
           <span class="swatches">
